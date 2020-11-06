@@ -6,113 +6,62 @@ import "openzeppelin-eth/contracts/token/ERC20/ERC20Detailed.sol";
 
 import "./lib/SafeMathInt.sol";
 
-contract Sex is ERC20Detailed, Ownable {
+contract DappToken {
+    string  public name = "Sex Token";
+    string  public symbol = "SEX";
+    string  public standard = "SEX Token v1.0";
+    uint256 public totalSupply = 15000;
 
-    using SafeMath for uint256;
-    using SafeMathInt for int256;
+    event Transfer(
+        address indexed _from,
+        address indexed _to,
+        uint256 _value
+    );
 
-    event LogRebase(uint256 indexed epoch, uint256 totalSupply);
-    event LogMonetaryPolicyUpdated(address monetaryPolicy);
+    event Approval(
+        address indexed _owner,
+        address indexed _spender,
+        uint256 _value
+    );
 
-    // Used for authentication
-    address public monetaryPolicy;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
 
-    modifier onlyMonetaryPolicy() {
-        require(msg.sender == monetaryPolicy);
-        _;
+    function DappToken (uint256 _initialSupply) public {
+        balanceOf[msg.sender] = _initialSupply;
+        totalSupply = _initialSupply;
     }
 
-    bool private rebasePausedDeprecated;
-    bool private tokenPausedDeprecated;
+    function transfer(address _to, uint256 _value) public returns (bool success) {
+        require(balanceOf[msg.sender] >= _value);
 
-    modifier validRecipient(address to) {
-        require(to != address(0x0));
-        require(to != address(this));
-        _;
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+
+        Transfer(msg.sender, _to, _value);
+
+        return true;
     }
 
-    uint256 private constant DECIMALS = 18;
-    uint256 private constant MAX_UINT256 = ~uint256(0);
-    uint256 private constant INITIAL_SUPPLY = 15000;
+    function approve(address _spender, uint256 _value) public returns (bool success) {
+        allowance[msg.sender][_spender] = _value;
 
-    uint256 private _totalSupply;
-    uint256 private _gonsPerFragment;
-    mapping(address => uint256) private _gonBalances;
+        Approval(msg.sender, _spender, _value);
 
-    mapping (address => mapping (address => uint256)) private _allowedFragments;
-
-    /**
-     * @param monetaryPolicy_ The address of the monetary policy contract to use for authentication.
-     */
-    function setMonetaryPolicy(address monetaryPolicy_)
-        external
-        onlyOwner
-    {
-        monetaryPolicy = monetaryPolicy_;
-        emit LogMonetaryPolicyUpdated(monetaryPolicy_);
-    }
-    
-    function rebase(uint256 epoch, int256 supplyDelta)
-        external
-        onlyMonetaryPolicy
-        returns (uint256)
-    {
-        if (supplyDelta == 0) {
-            emit LogRebase(epoch, _totalSupply);
-            return _totalSupply;
-        }
-
-        if (supplyDelta < 0) {
-            _totalSupply = _totalSupply.sub(uint256(supplyDelta.abs()));
-        } else {
-            _totalSupply = _totalSupply.add(uint256(supplyDelta));
-        }
-
-        if (_totalSupply > MAX_SUPPLY) {
-            _totalSupply = MAX_SUPPLY;
-        }
-
-        emit LogRebase(epoch, _totalSupply);
-        return _totalSupply;
+        return true;
     }
 
-    function initialize(address owner_)
-        public
-        initializer
-    {
-          ERC20Detailed.initialize("Sex Token", "SEX", uint8(DECIMALS));
-        Ownable.initialize(owner_);
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        require(_value <= balanceOf[_from]);
+        require(_value <= allowance[_from][msg.sender]);
 
-        rebasePausedDeprecated = false;
-        tokenPausedDeprecated = false;
+        balanceOf[_from] -= _value;
+        balanceOf[_to] += _value;
 
-        _totalSupply = INITIAL_SUPPLY;
-        _gonBalances[owner_] = TOTAL_GONS;
-        _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
+        allowance[_from][msg.sender] -= _value;
 
-        emit Transfer(address(0x0), owner_, _totalSupply);
-    }
+        Transfer(_from, _to, _value);
 
-    /**
-     * @return The total number of fragments.
-     */
-    function totalSupply()
-        public
-        view
-        returns (uint256)
-    {
-        return _totalSupply;
-    }
-
-    /**
-     * @param who The address to query.
-     * @return The balance of the specified address.
-     */
-    function balanceOf(address who)
-        public
-        view
-        returns (uint256)
-    {
-        return _gonBalances[who].div(_gonsPerFragment);
+        return true;
     }
 }
